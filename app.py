@@ -1,3 +1,6 @@
+import sys
+sys.tracebacklimit = 1
+
 from fastapi import FastAPI
 from routes.user import user
 
