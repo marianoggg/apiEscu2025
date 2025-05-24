@@ -1,5 +1,7 @@
 from fastapi import APIRouter
-from models.modelo import session, User, InputUser
+from fastapi.responses import JSONResponse
+from models.modelo import session, User, UserDetail, PivoteUserCareer, InputUser, InputLogin, InputUserAddCareer
+from sqlalchemy.orm import joinedload
 
 user = APIRouter()
 
@@ -12,11 +14,26 @@ def helloUser():
 @user.get("/users/all")
 ### funcion helloUer documentacion
 def getAllUsers():
-    try: 
-        return session.query(User).all()
+    try:
+        usersWithDetail = session.query(User).options(joinedload(User.userdetail)).all()
+        usuarios_con_detalle = []
+        for user in usersWithDetail:
+            user_con_detalle = {
+                "id": user.id,
+                "username": user.username,
+                "password": user.password,
+                "first_name": user.userdetail.first_name,
+                "last_name": user.userdetail.last_name,
+                "dni": user.userdetail.dni,
+                "type": user.userdetail.type,
+                "email": user.userdetail.email,
+            }
+            usuarios_con_detalle.append(user_con_detalle)
+        return JSONResponse(status_code=200, content=usuarios_con_detalle)
     except Exception as ex:
         print("Error ---->> ", ex)
-
+        return {"message": "Error al obtener los usuarios"}
+    
 @user.get("/users/{us}/{pw}")
 ### funcion helloUer documentacion
 def loginUser(us:str, pw:str):
@@ -28,12 +45,71 @@ def loginUser(us:str, pw:str):
     else:
         return "Contraseña incorrecta!"
 
-@user.post("/users/new")
+@user.post("/users/add")
 def create_user(us: InputUser):
     try:
-        usu = User(us.id, us.username, us.password)
-        session.add(usu)
+        newUser = User(us.username, us.password)
+        newUserDetail = UserDetail(us.firstname, us.lastname, us.dni, us.type, us.email)
+        newUser.userdetail = newUserDetail
+        session.add(newUser)
         session.commit()
         return "Usuario creado con éxito!"
     except Exception as ex:
+        session.rollback()
         print("Error ---->> ", ex)
+    finally:
+        session.close()
+       
+@user.post("/users/login")
+def login_user(us: InputLogin):
+    try:
+        user = session.query(User).filter(User.username == us.username).first()
+        if user and user.password == us.password:
+            return user.curso 
+        else:
+            return {"message": "Invalid username or password"}
+    except Exception as ex:
+        print("Error ---->> ", ex)
+    finally:
+        session.close()
+
+
+## Inscribir un alumno a una carrera      
+@user.post("/user/addcareer")
+def addCareer(ins: InputUserAddCareer):
+    try: 
+        newInsc = PivoteUserCareer(ins.id_user, ins.id_career)
+        session.add(newInsc)
+        session.commit()
+        res = f"{newInsc.user.userdetail.first_name} {newInsc.user.userdetail.last_name} fue inscripto correctamente a {newInsc.career.name}"
+        print(res)
+        return res
+    except Exception as ex:
+        session.rollback()
+        print("Error al inscribir al alumno:", ex)
+        import traceback
+        traceback.print_exc()    
+    finally:
+        session.close()
+
+@user.get("/user/career/{_username}")
+def get_career_user(_username: str):
+    try:
+        userEncontrado = session.query(User).filter(User.username == _username ).first()
+        arraySalida = []
+        if(userEncontrado):
+            pivoteusercareer = userEncontrado.pivoteusercareer
+            for pivote in pivoteusercareer:
+                career_detail = {
+                    "usuario": f"{pivote.user.userdetail.first_name} {pivote.user.userdetail.last_name}",
+                    "carrera": pivote.career.name,
+                }
+                arraySalida.append(career_detail)
+            return arraySalida
+        else:
+            return "Usuario no encontrado!"
+    except Exception as ex:
+        session.rollback()
+        print("Error al traer usuario y/o pagos")
+    finally:
+        session.close()
