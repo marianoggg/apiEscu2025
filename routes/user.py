@@ -1,7 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from models.modelo import session, User, UserDetail, PivoteUserCareer, InputUser, InputLogin, InputUserAddCareer
 from sqlalchemy.orm import joinedload
+from auth.security import Security
 
 user = APIRouter()
 
@@ -13,23 +14,30 @@ def helloUser():
 
 @user.get("/users/all")
 ### funcion helloUer documentacion
-def getAllUsers():
+def getAllUsers(req: Request):
     try:
-        usersWithDetail = session.query(User).options(joinedload(User.userdetail)).all()
-        usuarios_con_detalle = []
-        for user in usersWithDetail:
-            user_con_detalle = {
-                "id": user.id,
-                "username": user.username,
-                "password": user.password,
-                "first_name": user.userdetail.first_name,
-                "last_name": user.userdetail.last_name,
-                "dni": user.userdetail.dni,
-                "type": user.userdetail.type,
-                "email": user.userdetail.email,
-            }
-            usuarios_con_detalle.append(user_con_detalle)
-        return JSONResponse(status_code=200, content=usuarios_con_detalle)
+        has_access = Security.verify_token(req.headers)
+        if "iat" in has_access:
+            usersWithDetail = session.query(User).options(joinedload(User.userdetail)).all()
+            usuarios_con_detalle = []
+            for user in usersWithDetail:
+                user_con_detalle = {
+                    "id": user.id,
+                    "username": user.username,
+                    "password": user.password,
+                    "first_name": user.userdetail.first_name,
+                    "last_name": user.userdetail.last_name,
+                    "dni": user.userdetail.dni,
+                    "type": user.userdetail.type,
+                    "email": user.userdetail.email,
+                }
+                usuarios_con_detalle.append(user_con_detalle)
+            return JSONResponse(status_code=200, content=usuarios_con_detalle)
+        else: 
+            return JSONResponse(
+                status_code=401,
+                content=has_access
+            )
     except Exception as ex:
         print("Error ---->> ", ex)
         return {"message": "Error al obtener los usuarios"}
@@ -65,9 +73,24 @@ def login_user(us: InputLogin):
     try:
         user = session.query(User).filter(User.username == us.username).first()
         if user and user.password == us.password:
-            return user.curso 
+            tkn = Security.generate_token(user)
+            if not tkn:
+                return {"message":"Error en la generación del token!"}
+            else:
+                res = {
+                        "status": "success",
+                        "token": tkn,
+                        "user": user.userdetail,
+                        "estado_del_tiempo":"llueve",
+                        "message":"User logged in successfully!"
+                    } 
+                
+                print(res)
+                return res
         else:
-            return {"message": "Invalid username or password"}
+            res= {"message": "Invalid username or password"}
+            print(res)
+            return res
     except Exception as ex:
         print("Error ---->> ", ex)
     finally:
