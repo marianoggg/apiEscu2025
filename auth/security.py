@@ -10,15 +10,17 @@ class Security:
 
     @classmethod
     def generate_token(cls, authUser):
+        print("aca-->",authUser.username, cls)
         payload = {
             "iat": cls.hoy(), 
             "exp": cls.hoy() + datetime.timedelta(minutes=480),
             "username" : authUser.username
         }
+
         try:
             return jwt.encode(payload, cls.secret, algorithm="HS256")
-        except Exception:
-            return None
+        except Exception as e:
+            print("Error al generar el token:", e)
         
     @classmethod
     def verify_token(cls, headers):
