@@ -9,10 +9,12 @@ from models.modelo import (
     InputLogin,
     InputUserAddCareer,
     InputPaginatedRequest,
+    InputPaginatedRequestFilter,
+    AsyncSessionLocal,
 )
+from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 from auth.security import Security
-from typing import Optional
 
 
 user = APIRouter()
@@ -254,6 +256,149 @@ async def get_users_paginated(req: Request, body: InputPaginatedRequest):
             status_code=200,
             content={"users": usuarios_con_detalles, "next_cursor": next_cursor},
         )
+
+    except Exception as error:
+        print("Error al obtener página de usuarios ----> ", error)
+        return JSONResponse(
+            status_code=500, content={"message": "Error al obtener página de usuarios"}
+        )
+
+
+# ruta paginated filtered con funcion sincronica
+@user.post("/user/paginated/filtered")
+def get_users_paginated_filtered(req: Request, body: InputPaginatedRequestFilter):
+    try:
+        has_access = Security.verify_token(req.headers)
+        if "iat" not in has_access:
+            return JSONResponse(status_code=401, content=has_access)
+
+        limit = body.limit
+        last_seen_id = body.last_seen_id
+
+        query = (
+            session.query(User).options(joinedload(User.userdetail)).order_by(User.id)
+        )
+
+        # 🔹 Filtros adicionales
+        if hasattr(body, "filters") and body.filters:
+            if "username" in body.filters:
+                query = query.filter(
+                    User.username.ilike(f"%{body.filters['username']}%")
+                )
+            if "type" in body.filters:
+                query = query.filter(User.userdetail.type == body.filters["type"])
+            if "email" in body.filters:
+                query = query.filter(
+                    User.userdetail.email.ilike(f"%{body.filters['email']}%")
+                )
+
+        # 🔹 Filtro por cursor
+        if last_seen_id is not None:
+            query = query.filter(User.id > last_seen_id)
+
+        users_with_detail = query.limit(limit)
+
+        usuarios_con_detalles = []
+        for us in users_with_detail:
+            user_con_detalle = {
+                "id": us.id,
+                "username": us.username,
+                "first_name": us.userdetail.first_name,
+                "last_name": us.userdetail.last_name,
+                "dni": us.userdetail.dni,
+                "type": us.userdetail.type,
+                "email": us.userdetail.email,
+            }
+            usuarios_con_detalles.append(user_con_detalle)
+
+        next_cursor = (
+            usuarios_con_detalles[-1]["id"]
+            if len(usuarios_con_detalles) == limit
+            else None
+        )
+
+        return JSONResponse(
+            status_code=200,
+            content={"users": usuarios_con_detalles, "next_cursor": next_cursor},
+        )
+
+    except Exception as error:
+        print("Error al obtener página de usuarios ----> ", error)
+        return JSONResponse(
+            status_code=500, content={"message": "Error al obtener página de usuarios"}
+        )
+
+
+# ruta paginated filtered con funcion async
+
+
+@user.post("/user/paginated/filtered/async")
+async def get_users_paginated_filtered_async(
+    req: Request, body: InputPaginatedRequestFilter
+):
+    try:
+        has_access = Security.verify_token(req.headers)
+        if "iat" not in has_access:
+            return JSONResponse(status_code=401, content=has_access)
+
+        limit = body.limit
+        last_seen_id = body.last_seen_id
+
+        async with AsyncSessionLocal() as session:
+
+            # Construcción de la consulta
+            stmt = select(User).options(joinedload(User.userdetail)).order_by(User.id)
+
+            # Filtros adicionales
+            if hasattr(body, "filters") and body.filters:
+                if "username" in body.filters:
+                    stmt = stmt.filter(
+                        User.username.ilike(f"%{body.filters['username']}%")
+                    )
+                if "type" in body.filters:
+                    stmt = stmt.filter(User.userdetail.type == body.filters["type"])
+                if "email" in body.filters:
+                    stmt = stmt.filter(
+                        User.userdetail.email.ilike(f"%{body.filters['email']}%")
+                    )
+
+            # Filtro por cursor
+            if last_seen_id is not None:
+                stmt = stmt.filter(User.id > last_seen_id)
+
+            # Limito resultados
+            stmt = stmt.limit(limit)
+
+            # Ejecuto la consulta
+            result = await session.execute(stmt)
+            users_with_detail = result.scalars().all()
+
+            # Armo la salida de datos
+            usuarios_con_detalles = [
+                {
+                    "id": us.id,
+                    "username": us.username,
+                    "first_name": us.userdetail.first_name,
+                    "last_name": us.userdetail.last_name,
+                    "dni": us.userdetail.dni,
+                    "type": us.userdetail.type,
+                    "email": us.userdetail.email,
+                }
+                for us in users_with_detail
+            ]
+
+            # armo la salida del cursor
+            next_cursor = (
+                usuarios_con_detalles[-1]["id"]
+                if len(usuarios_con_detalles) == limit
+                else None
+            )
+
+            # respondo con datos y cursor
+            return JSONResponse(
+                status_code=200,
+                content={"users": usuarios_con_detalles, "next_cursor": next_cursor},
+            )
 
     except Exception as error:
         print("Error al obtener página de usuarios ----> ", error)

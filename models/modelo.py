@@ -1,9 +1,9 @@
 from configs.db import engine, Base
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from sqlalchemy.orm import sessionmaker, relationship
-from pydantic import BaseModel
 import datetime
-from typing import Optional
+from typing import Optional, Dict, Any
+from pydantic import BaseModel, Field
 
 
 # region Modelos SQLAlchemy
@@ -127,6 +127,22 @@ class InputPaginatedRequest(BaseModel):
     last_seen_id: Optional[int] = None
 
 
+from typing import Optional, Dict, Any
+from pydantic import BaseModel, Field
+
+
+class InputPaginatedRequestFilter(BaseModel):
+    limit: int = Field(
+        20, gt=0, le=100, description="Cantidad máxima de registros a retornar"
+    )
+    last_seen_id: Optional[int] = Field(
+        None, description="ID del último registro visto (cursor) para keyset pagination"
+    )
+    filter: Optional[Dict[str, Any]] = Field(
+        None, description="Filtros opcionales de búsqueda"
+    )
+
+
 # endregion
 
 # region configuraciones
@@ -135,4 +151,20 @@ Base.metadata.create_all(bind=engine)
 Session = sessionmaker(bind=engine)
 
 session = Session()
+# endregion
+
+
+# region configuracion de session asincrono para poder usar async en las funciones decoradas de los endpoints
+
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker
+
+DATABASE_URL = "postgresql+asyncpg://user:pass@localhost/dbname"
+
+engine = create_async_engine(DATABASE_URL, echo=True)
+
+AsyncSessionLocal = sessionmaker(
+    bind=engine, class_=AsyncSession, expire_on_commit=False
+)
+
 # endregion
