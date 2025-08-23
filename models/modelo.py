@@ -146,25 +146,31 @@ class InputPaginatedRequestFilter(BaseModel):
 # endregion
 
 # region configuraciones
+
+# ======================
+# Configuración de DB
+# ======================
 Base.metadata.create_all(bind=engine)
 
-Session = sessionmaker(bind=engine)
-
+Session = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 session = Session()
-# endregion
 
-
-# region configuracion de session asincrono para poder usar async en las funciones decoradas de los endpoints
-
+# ======================
+# (Opcional) Config async para el futuro
+# ======================
+"""
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
 
-DATABASE_URL = "postgresql+asyncpg://user:pass@localhost/dbname"
+ASYNC_DATABASE_URL = "postgresql+asyncpg://user:pass@localhost/dbname"
 
-engine = create_async_engine(DATABASE_URL, echo=True)
+async_engine = create_async_engine(ASYNC_DATABASE_URL, echo=True)
 
 AsyncSessionLocal = sessionmaker(
-    bind=engine, class_=AsyncSession, expire_on_commit=False
+    bind=async_engine,
+    class_=AsyncSession,
+    expire_on_commit=False
 )
+"""
+
 
 # endregion

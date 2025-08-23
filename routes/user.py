@@ -10,7 +10,7 @@ from models.modelo import (
     InputUserAddCareer,
     InputPaginatedRequest,
     InputPaginatedRequestFilter,
-    AsyncSessionLocal,
+    # AsyncSessionLocal,
 )
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
@@ -265,7 +265,7 @@ async def get_users_paginated(req: Request, body: InputPaginatedRequest):
 
 
 # ruta paginated filtered con funcion sincronica
-@user.post("/user/paginated/filtered")
+""" @user.post("/user/paginated/filtered")
 def get_users_paginated_filtered(req: Request, body: InputPaginatedRequestFilter):
     try:
         has_access = Security.verify_token(req.headers)
@@ -327,12 +327,12 @@ def get_users_paginated_filtered(req: Request, body: InputPaginatedRequestFilter
         return JSONResponse(
             status_code=500, content={"message": "Error al obtener página de usuarios"}
         )
-
+ """
 
 # ruta paginated filtered con funcion async
 
 
-@user.post("/user/paginated/filtered/async")
+""" @user.post("/user/paginated/filtered/async")
 async def get_users_paginated_filtered_async(
     req: Request, body: InputPaginatedRequestFilter
 ):
@@ -405,3 +405,4 @@ async def get_users_paginated_filtered_async(
         return JSONResponse(
             status_code=500, content={"message": "Error al obtener página de usuarios"}
         )
+ """
