@@ -211,7 +211,7 @@ def get_users_paginated(req: Request, body: InputPaginatedRequest):
 # endregion endpoints sin filtrados
 
 
-# region ep filtrados
+# region endpoints filtrados
 
 
 # ruta paginated filtrada (recibe un str) con fcion sincronica
@@ -439,4 +439,4 @@ async def get_users_paginated_filtered_async(
         )
 
 
-# endregion ep filtrados
+# endregion endpoints filtrados
