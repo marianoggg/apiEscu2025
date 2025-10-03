@@ -439,4 +439,75 @@ async def get_users_paginated_filtered_async(
         )
 
 
+# ruta paginada filtrada (recibe un str) con funcion async
+@user.post("/user/paginated/filtered-str-async")
+async def get_users_paginated_filtered_str_async(
+    req: Request, body: InputPaginatedRequest
+):
+    try:
+        has_access = Security.verify_token(req.headers)
+
+        if "iat" not in has_access:
+            return JSONResponse(status_code=401, content=has_access)
+
+        limit = body.limit
+        last_seen_id = body.last_seen_id
+        search_text = getattr(body, "search", "").strip()
+
+        async with AsyncSessionLocal() as session:
+            stmt = (
+                select(User)
+                .join(User.userdetail)
+                .options(joinedload(User.userdetail))
+                .order_by(User.id)
+            )
+
+            if last_seen_id is not None:
+                stmt = stmt.filter(User.id > last_seen_id)
+
+            if search_text:
+                search_pattern = f"%{search_text}%"
+                stmt = stmt.filter(
+                    or_(
+                        UserDetail.first_name.ilike(search_pattern),
+                        UserDetail.last_name.ilike(search_pattern),
+                        UserDetail.email.ilike(search_pattern),
+                    )
+                )
+
+            # ejecutar la query con limit
+            result = session.execute(stmt.limit(limit))
+            users_with_detail = result.scalars().all()
+
+            usuarios_con_detalles = []
+            for us in users_with_detail:
+                user_con_detalle = {
+                    "id": us.id,
+                    "username": us.username,
+                    "first_name": us.userdetail.first_name,
+                    "last_name": us.userdetail.last_name,
+                    "dni": us.userdetail.dni,
+                    "type": us.userdetail.type,
+                    "email": us.userdetail.email,
+                }
+                usuarios_con_detalles.append(user_con_detalle)
+
+            next_cursor = (
+                usuarios_con_detalles[-1]["id"]
+                if len(usuarios_con_detalles) == limit
+                else None
+            )
+
+            return JSONResponse(
+                status_code=200,
+                content={"users": usuarios_con_detalles, "next_cursor": next_cursor},
+            )
+    except Exception as error:
+        print("Error al obtener página de usuarios filtradas --->", error)
+        return JSONResponse(
+            status_code=500,
+            content={"message": "Error al obterner página de usuarios filtrada"},
+        )
+
+
 # endregion endpoints filtrados
